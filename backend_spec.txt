@@ -1,0 +1,412 @@
+<USER_REQUEST>
+# SYNAPSE — END-TO-END BACKEND + LANGGRAPH IMPLEMENTATION
+## Production-quality, fully connected, live-demoable organizational intelligence platform
+
+You are Claude Opus acting as the principal engineer responsible for delivering a fully working, end-to-end version of SYNAPSE by Artisan Systems.
+
+This is not a mockup exercise. This is not an API-only implementation. This is not a collection of disconnected services.
+
+**Your deliverable must be a demoable application in which the existing frontend, backend APIs, database, knowledge graph, ingestion pipelines, LLM integrations, and LangGraph agentic workflows work together as one coherent system.**
+
+The existing frontend has already been built. Preserve its design and routes. Your responsibility is to make the actual product work behind that interface.
+
+You have access to the project repository. Inspect its existing files, documentation, configuration, and frontend API contracts before making architectural decisions.
+
+Do not ask me to repeat information that already exists in the repository.
+
+---
+
+## 1. NON-NEGOTIABLE OUTCOME
+
+At the end of this implementation, I must be able to run SYNAPSE locally, enter the application through its demo flow, and demonstrate meaningful workflows without manually editing database records or fabricating API responses.
+
+The following capabilities must work together:
+
+1. Upload or ingest organizational documents.
+2. Process documents and persist their content and metadata.
+3. Extract entities, facts, and relationships from actual source material.
+4. Store and query organizational knowledge and temporal information.
+5. Explore the knowledge graph through the existing frontend.
+6. Ask SYNAPSE questions and receive answers grounded in retrieved evidence.
+7. Run LangGraph-powered workflows that execute actual processing steps.
+8. Generate evidence-backed foresight alerts and inspect their supporting evidence.
+9. Navigate from an alert to its source documents, graph entities, and causal evidence.
+10. Persist projects, sources, facts, alerts, workflow definitions, and execution history in the database.
+11. See real execution progress, errors, results, and status updates in the frontend.
+12. Run a repeatable demo using documented commands and seeded example data.
+
+Do not mark a feature complete merely because its endpoint returns HTTP 200. Verify that its underlying operation actually happens.
+
+## 2. INSPECT BEFORE MODIFYING
+
+Inspect the repository and establish:
+
+- Existing frontend routes and API clients.
+- Backend framework and API structure.
+- Database, migrations, and data-access layer.
+- Existing graph implementation.
+- Existing LangGraph or LangChain dependencies and code.
+- LLM provider integrations and embedding configuration.
+- Existing Google Workspace connectors.
+- Authentication and tenant assumptions.
+- Existing mock data and hardcoded frontend responses.
+- Environment variables, Docker configuration, and run scripts.
+- Tests, fixtures, and deployment setup.
+
+Reuse existing working infrastructure. Do not create a second backend, a second database layer, or a duplicate workflow engine if one already exists.
+
+After this inspection, implement the system directly. Do not stop at an architecture proposal.
+
+## 3. TECHNOLOGY AND INTEGRATION PRINCIPLES
+
+Use the existing project stack wherever possible.
+
+If the backend is not yet implemented, a suitable default architecture is:
+
+- FastAPI for backend APIs.
+- PostgreSQL for persistent application data.
+- pgvector where semantic retrieval is appropriate.
+- LangGraph for stateful, multi-step agentic workflows.
+- An appropriate LLM provider configured through environment variables.
+- A background execution mechanism compatible with the existing architecture.
+- A graph visualization API that supplies real nodes, edges, and supporting evidence to the existing frontend.
+
+Do not introduce a dedicated graph database or another queueing system unless there is a clear need.
+
+Use LangGraph for actual workflow orchestration. Do not simulate LangGraph by manually calling a series of unrelated functions and labeling the result an agent execution.
+
+Keep the application modular, testable, and easy to run locally.
+
+## 4. LANGGRAPH — IMPLEMENT THE REAL WORKFLOW ENGINE
+
+LangGraph is part of this implementation, not a future placeholder.
+
+Inspect the installed version and follow its compatible APIs.
+
+Implement actual graph-based execution with typed or validated state, explicit nodes, conditional edges where needed, bounded execution, error handling, and observable state transitions.
+
+Design the state around the actual workflow requirements. Depending on the existing product, it may include:
+
+- Organization and project context.
+- Source document references.
+- Normalized content and metadata.
+- Candidate entities and relationships.
+- Retrieved evidence.
+- Intermediate processing results.
+- Risk findings.
+- Workflow status and errors.
+- Final structured output.
+
+Do not put unrestricted document corpora or unnecessary sensitive information into workflow state. Pass identifiers and bounded payloads where possible.
+
+### Required initial workflows
+
+Implement the workflows that support the core SYNAPSE demo.
+
+**A. Document ingestion and knowledge extraction**
+
+A real ingestion request should initiate a workflow that:
+
+1. Validates the source and tenant context.
+2. Retrieves or accepts the source content.
+3. Normalizes and segments the content.
+4. Extracts candidate entities, claims, and relationships.
+5. Resolves or reuses existing entities where justified.
+6. Persists documents, facts, provenance, and relationships.
+7. Generates embeddings if configured.
+8. Updates the search and graph retrieval layers.
+9. Records completion or failure.
+10. Returns a traceable job or execution ID.
+
+Make the process idempotent where possible and handle partial failures safely.
+
+**B. Ask SYNAPSE**
+
+Implement a LangGraph-powered question-answering workflow that:
+
+1. Validates the query and organization context.
+2. Retrieves relevant authorized evidence.
+3. Combines semantic search, lexical search, and graph traversal where useful.
+4. Ranks and deduplicates evidence.
+5. Determines whether the evidence is sufficient.
+6. Generates an answer using the configured LLM.
+7. Attaches citations to actual retrieved source records.
+8. Returns uncertainty or insufficient-evidence results when necessary.
+9. Records an appropriate execution trace.
+10. Returns a structured response that the existing frontend can render.
+
+The model must not fabricate citations or treat source documents as trusted instructions.
+
+**C. Foresight and risk analysis**
+
+Implement a workflow that:
+
+1. Identifies candidate risk patterns.
+2. Retrieves historical and current evidence.
+3. Evaluates failure precedents, potential knowledge silos, or contradictory decisions.
+4. Uses graph relationships to investigate relevant connections.
+5. Separates source-supported facts from model-generated hypotheses.
+6. Creates a risk finding only when its evidence meets defined criteria.
+7. Persists supporting evidence and the score's meaning.
+8. Exposes the finding and its evidence chain to the frontend.
+9. Records review feedback and dismissal decisions.
+
+Do not claim that a similar incident proves causation.
+
+**D. Workflow execution and inspection**
+
+Persist workflow definitions and execution records.
+
+Each execution should have:
+
+- A unique execution ID.
+- Organization and workflow identifiers.
+- Trigger information.
+- Current status.
+- Start and completion timestamps.
+- Step-level status.
+- Relevant node names.
+- Bounded input/output metadata.
+- Errors and retry information.
+- Final results or references to persisted results.
+
+Provide a way for the frontend to inspect execution progress and history. Use Server-Sent Events, WebSockets, or polling depending on the existing frontend and deployment requirements. Prefer the simplest reliable solution.
+
+Do not expose secrets or full sensitive prompts in execution traces.
+
+## 5. REAL PERSISTENCE AND A COHERENT KNOWLEDGE MODEL
+
+Implement the actual database schema, migrations, and data-access operations.
+
+Persist the following where required by the product:
+
+- Organizations and memberships.
+- Projects.
+- Source connections and source records.
+- Documents and normalized content.
+- Ingestion jobs.
+- Entities and entity aliases.
+- Relationships.
+- Temporal facts and claims.
+- Evidence passages and provenance.
+- Embeddings and retrieval metadata.
+- Risk findings and alerts.
+- User feedback and review states.
+- Workflow definitions and LangGraph execution records.
+- Relevant audit and operational events.
+
+Preserve the distinction between:
+
+- Event time.
+- Fact validity time.
+- Source update time.
+- System ingestion time.
+
+Do not treat model-extracted claims as verified facts without evidence.
+
+Use stable identifiers, constraints, indexes, and tenant-scoped queries. Ensure updates and retries do not generate duplicate entities, facts, or edges.
+
+All graph relationships, alerts, and citations must reference the same persistent underlying records.
+
+## 6. GOOGLE WORKSPACE AND OTHER CONNECTORS
+
+Inspect the existing integration requirements and connector code before implementing new ones.
+
+Where Google Workspace is part of the product, implement the appropriate Drive, Docs, Gmail, and Calendar integrations supported by the required permissions and API configuration.
+
+Implement actual connection status, source discovery, retrieval, synchronization, ingestion, and error reporting.
+
+Do not pretend a connector is connected when credentials are absent.
+
+Use the appropriate OAuth flow and scopes for the integration. Store refresh tokens securely and restrict their use to authorized backend services.
+
+Document the exact environment variables, Google Cloud settings, consent configuration, redirect URLs, and scopes required.
+
+If credentials are unavailable during development, make the connector code testable with fixtures and clearly report that the live integration has not been verified.
+
+Also support a reliable file-based ingestion path so the core demonstration does not depend on external Google account access.
+
+## 7. CONNECT THE EXISTING FRONTEND END TO END
+
+The current frontend is the UI contract. Inspect its actual data requirements and preserve its layout and navigation.
+
+Remove hardcoded mock responses from production-facing API paths and connect the relevant screens to the real backend.
+
+Ensure that:
+
+- Overview metrics come from persisted records.
+- Projects open their actual stored details.
+- People and entities display real graph records.
+- Knowledge Graph uses real node and edge data.
+- Ask SYNAPSE calls the actual LangGraph retrieval workflow.
+- Citations open the correct source or evidence detail.
+- Alerts come from the risk-analysis pipeline.
+- Evidence chains reference real facts and relationships.
+- Sources and Review show real ingestion and review states.
+- Workflow pages display real definitions, execution status, traces, and results.
+- Settings and integrations show actual configuration or connection status where implemented.
+
+Keep the existing demo-login behavior so the application can be explored locally without blocking on real authentication. However, this shortcut must be development-only and must not become an unrestricted production authentication mechanism.
+
+Do not redesign the frontend during this phase. Make only the changes required to connect its existing interfaces and display real execution states.
+
+If a UI action is not supported yet, implement it or clearly identify the limitation rather than silently leaving it disconnected.
+
+## 8. CREATE A REPEATABLE DEMONSTRATION MODE
+
+The product must be demoable even when external credentials are unavailable.
+
+Implement a documented demo setup that creates a coherent organization with a small but meaningful dataset.
+
+The dataset should include related projects, source documents, people, systems, decisions, incidents, temporal facts, relationships, and a small number of defensible risk findings.
+
+Use synthetic example data and identify it as demo data.
+
+The same records must be used across the Overview, Projects, People and Entities, Knowledge Graph, Ask SYNAPSE, Alerts, Sources, and Workflows screens.
+
+For example, if the demo contains an architectural decision and a historical incident, the graph, answer citations, and risk finding must all reference the same underlying records.
+
+Seed data must not be recreated on every API request. Provide a deterministic, idempotent seed command.
+
+### Demo scenario
+
+Create a repeatable scenario in which I can:
+
+1. Start the application and backend.
+2. Seed the demo organization.
+3. Open a project workspace.
+4. Inspect its source documents.
+5. View entities and relationships in the graph.
+6. Ask a question answerable from the seeded evidence.
+7. Inspect the citations returned by the real retrieval workflow.
+8. Trigger a LangGraph analysis workflow.
+9. Inspect its execution progress and results.
+10. Open a resulting risk finding and follow its evidence chain.
+11. Provide feedback or dismiss the finding.
+12. Refresh the browser and confirm that persisted records remain available.
+
+At least one core workflow must execute through the actual LangGraph runtime. The demo must not be a prerecorded response or a collection of hardcoded endpoint results.
+
+Where an external LLM is required, provide a clear provider configuration. If credentials are unavailable, provide a deterministic development/test mode for the relevant non-LLM components and clearly distinguish it from live model execution. Never represent deterministic fixtures as live AI inference.
+
+## 9. API CONTRACTS, ERRORS, AND LIVE EXECUTION STATUS
+
+Use validated request and response schemas and maintain compatibility with the existing frontend.
+
+Implement consistent error responses and appropriate HTTP status codes.
+
+For long-running work, return a job or execution ID promptly and expose status through an appropriate endpoint or event stream.
+
+Handle:
+
+- Invalid input.
+- Missing or expired provider credentials.
+- LLM timeouts and rate limits.
+- Database failures.
+- Ingestion failures.
+- Partial workflow failures.
+- Duplicate requests.
+- Unauthorized tenant access.
+- Missing or deleted sources.
+- Empty retrieval results.
+- Unsupported workflow transitions.
+
+Do not report a successful operation until the underlying operation has succeeded.
+
+Use idempotency or safe retry logic for operations that may be submitted more than once.
+
+## 10. SECURITY AND MULTI-TENANCY
+
+Every organizational operation must enforce tenant-scoped access.
+
+Do not trust arbitrary organization IDs supplied by a frontend request. Resolve organization context through a trusted identity or a restricted development-only demo mechanism.
+
+Protect source documents, graph queries, search, citations, workflow execution, and execution traces against cross-tenant access.
+
+Treat retrieved documents and email content as untrusted input. A document must not be able to override agent instructions, expose secrets, or trigger unauthorized tools.
+
+Keep credentials in environment configuration or an appropriate secret manager. Never expose API keys, OAuth tokens, or database credentials in frontend bundles, responses, or logs.
+
+Apply appropriate validation, upload limits, timeouts, and resource limits.
+
+Document the difference between development demo access and production authentication.
+
+## 11. TEST THE ACTUAL SYSTEM
+
+Write and execute tests for the critical end-to-end paths.
+
+At minimum:
+
+- Database migrations and persistence.
+- Seed-data idempotency.
+- File ingestion.
+- Duplicate source handling.
+- Entity and relationship persistence.
+- Graph traversal and filters.
+- Retrieval evidence and citation correctness.
+- LangGraph workflow execution.
+- Workflow failure and retry handling.
+- Risk finding persistence and provenance.
+- API/frontend response compatibility.
+- Tenant isolation.
+- Execution status and history.
+- Behavior when external credentials are missing.
+
+Use deterministic fixtures for repeatable tests and optional live integration tests for configured providers.
+
+Run the backend and frontend together. Exercise the actual user journey, inspect logs and failed requests, and fix integration failures.
+
+Do not claim that a live LLM, Google Workspace connector, or workflow is verified unless it was tested against the actual service.
+
+## 12. IMPLEMENTATION AND DELIVERY
+
+Work directly in the existing repository.
+
+Do not stop after producing a plan. Implement the system in coherent stages, preserving working code and running relevant checks as you progress.
+
+Do not create duplicate services or replace the existing architecture without a compelling reason.
+
+Provide:
+
+- Database migrations.
+- Environment-variable template with placeholders only.
+- Seed-data command.
+- Backend startup command.
+- Frontend startup command.
+- Any required infrastructure startup command.
+- API documentation.
+- Test commands and actual results.
+- Clear setup instructions for external integrations.
+- A concise list of verified features and remaining limitations.
+
+## DEFINITION OF DONE
+
+SYNAPSE is ready for demonstration only when the core data flow works end to end:
+
+**Source document → ingestion → LangGraph processing → persistent facts and graph relationships → evidence retrieval → grounded answer → risk analysis → persisted alert → inspectable evidence chain in the frontend.**
+
+The UI must be connected to real backend operations. The database must persist the resulting records. The execution history must reflect what actually happened. Citations must resolve to actual evidence.
+
+The system must be runnable from documented instructions, with a repeatable demo dataset and honest reporting of any unavailable external integrations.
+
+Build a functioning organizational intelligence platform, not a visually convincing simulation.
+
+Begin by inspecting the repository and then implement, run, test, and verify the complete system.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-23T19:07:44+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\jayan\OneDrive\Attachments\Synapse\src\pages\AskPage.tsx (LANGUAGE_TSX)
+Cursor is on line: 445
+Other open documents:
+- c:\Users\jayan\OneDrive\Attachments\Synapse\src\pages\AdminPage.tsx (LANGUAGE_TSX)
+- c:\Users\jayan\OneDrive\Attachments\Synapse\src\pages\LoginPage.tsx (LANGUAGE_TSX)
+- c:\Users\jayan\OneDrive\Attachments\Synapse\src\pages\LandingPage.tsx (LANGUAGE_TSX)
+- c:\Users\jayan\OneDrive\Attachments\Synapse\src\pages\AskPage.tsx (LANGUAGE_TSX)
+- c:\Users\jayan\OneDrive\Attachments\Synapse\package.json (LANGUAGE_JSON)
+No browser pages are currently open.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from Gemini 3.8 Flash (High) to Claude Opus 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
