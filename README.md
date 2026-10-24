@@ -93,13 +93,16 @@ Run the end-to-end integration and workflow test suite:
 python -m unittest backend/tests/test_backend.py -v
 ```
 
-All 6 automated tests verify:
-1. `test_01_seed_data_idempotency`: Multi-run database seed stability.
-2. `test_02_graph_engine_neighborhood_and_paths`: Ego-network and multi-hop path traversal.
-3. `test_03_temporal_validity`: Time-window queries (`validFrom`, `validTo`) filtering superseded decisions.
-4. `test_04_langgraph_ingestion_workflow`: Document chunking, NER extraction, and knowledge persistence.
-5. `test_05_langgraph_ask_workflow`: Grounded Q&A with verifiable citations and traversal paths.
-6. `test_06_langgraph_foresight_workflow`: Precedent causal chains and risk alert scoring.
+The suite uses a temporary SQLite database and disables Neo4j synchronization, so it does not modify `data_storage/synapse.db` or a configured Neo4j instance.
+
+All 7 automated tests verify:
+1. `test_00_uses_isolated_database`: The suite uses its temporary SQLite database.
+2. `test_01_seed_data_idempotency`: Multi-run database seed stability.
+3. `test_02_graph_engine_neighborhood_and_paths`: Ego-network and multi-hop path traversal.
+4. `test_03_temporal_validity`: Time-window queries (`validFrom`, `validTo`) filtering superseded decisions.
+5. `test_04_langgraph_ingestion_workflow`: Document chunking, NER extraction, and knowledge persistence.
+6. `test_05_langgraph_ask_workflow`: Grounded Q&A with verifiable citations and traversal paths.
+7. `test_06_langgraph_foresight_workflow`: Precedent causal chains and risk alert scoring.
 
 ---
 

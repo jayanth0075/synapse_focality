@@ -1,5 +1,6 @@
-import os
+import tempfile
 import unittest
+from pathlib import Path
 from backend.services.seed_data import seed_database
 from backend.database import get_db_connection
 from backend.graph.engine import KnowledgeGraphEngine
@@ -11,8 +12,24 @@ from backend.config import settings
 class TestSynapseBackend(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Seed test database
+        cls._original_database_path = settings.DATABASE_PATH
+        cls._original_neo4j_uri = settings.NEO4J_URI
+        cls._original_neo4j_password = settings.NEO4J_PASSWORD
+        cls._test_data_dir = tempfile.TemporaryDirectory()
+        settings.DATABASE_PATH = str(Path(cls._test_data_dir.name) / "synapse_test.db")
+        settings.NEO4J_URI = ""
+        settings.NEO4J_PASSWORD = ""
+        cls.addClassCleanup(setattr, settings, "DATABASE_PATH", cls._original_database_path)
+        cls.addClassCleanup(setattr, settings, "NEO4J_URI", cls._original_neo4j_uri)
+        cls.addClassCleanup(setattr, settings, "NEO4J_PASSWORD", cls._original_neo4j_password)
+        cls.addClassCleanup(cls._test_data_dir.cleanup)
         seed_database(force=True)
+
+    def test_00_uses_isolated_database(self):
+        self.assertEqual(
+            Path(settings.DATABASE_PATH).parent,
+            Path(self._test_data_dir.name),
+        )
 
     def test_01_seed_data_idempotency(self):
         with get_db_connection() as conn:
