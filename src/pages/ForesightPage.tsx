@@ -15,8 +15,9 @@ import { apiClient } from '../api/client';
 
 interface ForesightPageProps {
   alerts: ForesightAlert[];
-  onUpdateAlertFeedback: (alertId: string, feedback: 'useful' | 'not_useful') => void;
-  onDismissAlert: (alertId: string) => void;
+  onUpdateAlertFeedback: (alertId: string, feedback: 'useful' | 'not_useful') => Promise<void>;
+  onDismissAlert: (alertId: string) => Promise<void>;
+  onRunComplete: () => Promise<void>;
   onExploreEvidenceNode?: (nodeId: string) => void;
 }
 
@@ -24,6 +25,7 @@ export const ForesightPage: React.FC<ForesightPageProps> = ({
   alerts,
   onUpdateAlertFeedback,
   onDismissAlert,
+  onRunComplete,
   onExploreEvidenceNode,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -41,22 +43,33 @@ export const ForesightPage: React.FC<ForesightPageProps> = ({
     setIsSweeping(true);
     try {
       const res = await apiClient.runForesightAnalysis();
-      setFeedbackToast(`LangGraph Foresight Sweep complete: Verified ${res.alertsGenerated || 2} active risk precedents.`);
-    } catch {
-      setFeedbackToast('Foresight risk sweep executed successfully.');
+      await onRunComplete();
+      setFeedbackToast(`Risk sweep completed: ${res.alertsGenerated} alerts generated.`);
+    } catch (error) {
+      setFeedbackToast(error instanceof Error ? error.message : 'Risk sweep failed.');
     } finally {
-      setTimeout(() => setIsSweeping(false), 900);
+      setIsSweeping(false);
       setTimeout(() => setFeedbackToast(null), 4000);
     }
   };
 
-  const handleFeedback = (alertId: string, feedback: 'useful' | 'not_useful') => {
-    onUpdateAlertFeedback(alertId, feedback);
-    setFeedbackToast(
-      feedback === 'useful'
-        ? 'Feedback logged: Model calibrated to boost weight for this failure precedent.'
-        : 'Feedback logged: Model calibrated to suppress low-relevance precedent alerts.'
-    );
+  const handleFeedback = async (alertId: string, feedback: 'useful' | 'not_useful') => {
+    try {
+      await onUpdateAlertFeedback(alertId, feedback);
+      setFeedbackToast('Alert feedback saved.');
+    } catch (error) {
+      setFeedbackToast(error instanceof Error ? error.message : 'Could not save alert feedback.');
+    }
+    setTimeout(() => setFeedbackToast(null), 3500);
+  };
+
+  const handleDismiss = async (alertId: string) => {
+    try {
+      await onDismissAlert(alertId);
+      setFeedbackToast('Alert dismissed.');
+    } catch (error) {
+      setFeedbackToast(error instanceof Error ? error.message : 'Could not dismiss alert.');
+    }
     setTimeout(() => setFeedbackToast(null), 3500);
   };
 
@@ -281,7 +294,7 @@ export const ForesightPage: React.FC<ForesightPageProps> = ({
                   {/* Actions Bar */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
-                      onClick={() => handleFeedback(alert.id, 'useful')}
+                      onClick={() => void handleFeedback(alert.id, 'useful')}
                       className={`btn btn-sm ${alert.feedbackStatus === 'useful' ? 'btn-primary' : 'btn-secondary'}`}
                       style={{ fontSize: '0.75rem', padding: '4px 8px' }}
                       title="Validate alert: Adjusts Foresight thresholds to keep warning similar patterns"
@@ -291,7 +304,7 @@ export const ForesightPage: React.FC<ForesightPageProps> = ({
                     </button>
 
                     <button
-                      onClick={() => handleFeedback(alert.id, 'not_useful')}
+                      onClick={() => void handleFeedback(alert.id, 'not_useful')}
                       className={`btn btn-sm ${alert.feedbackStatus === 'not_useful' ? 'btn-danger' : 'btn-secondary'}`}
                       style={{ fontSize: '0.75rem', padding: '4px 8px' }}
                       title="Suppress alert: Calibrates system to avoid false alarms"
@@ -301,7 +314,7 @@ export const ForesightPage: React.FC<ForesightPageProps> = ({
                     </button>
 
                     <button
-                      onClick={() => onDismissAlert(alert.id)}
+                      onClick={() => void handleDismiss(alert.id)}
                       className="btn btn-outline btn-sm"
                       style={{ fontSize: '0.75rem', padding: '4px 8px' }}
                     >

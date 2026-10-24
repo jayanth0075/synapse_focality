@@ -5,6 +5,9 @@ import {
   ForesightAlert,
   ReviewQueueItem,
   SourceConnector,
+  IngestedDocument,
+  ConnectorSyncResult,
+  DocumentIngestionResult,
   AgentWorkflow,
   AskMessage,
   UserSession,
@@ -138,7 +141,7 @@ export const apiClient = {
     return res.json();
   },
 
-  async syncConnector(connectorId: string): Promise<any> {
+  async syncConnector(connectorId: string): Promise<ConnectorSyncResult> {
     const res = await fetch(`${API_BASE}/sources/connectors/${connectorId}/sync`, {
       method: 'POST',
     });
@@ -149,6 +152,12 @@ export const apiClient = {
   async getReviewQueue(): Promise<ReviewQueueItem[]> {
     const res = await fetch(`${API_BASE}/sources/review-queue`);
     if (!res.ok) throw new Error('Failed to fetch review queue');
+    return res.json();
+  },
+
+  async getDocuments(): Promise<IngestedDocument[]> {
+    const res = await fetch(`${API_BASE}/documents`);
+    if (!res.ok) throw new Error(`Failed to fetch documents (${res.status})`);
     return res.json();
   },
 
@@ -170,7 +179,7 @@ export const apiClient = {
     author?: string;
     acl_group?: string;
     project_id?: string;
-  }): Promise<any> {
+  }): Promise<DocumentIngestionResult> {
     const res = await fetch(`${API_BASE}/documents/ingest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

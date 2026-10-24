@@ -1,10 +1,35 @@
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from backend.services.ingestion_service import IngestionService
 from backend.models.domain import IngestDocumentRequest
 from backend.config import settings
+from backend.database import get_db_connection
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+@router.get("", response_model=List[Dict[str, Any]])
+def list_documents(tenant_id: str = settings.DEFAULT_TENANT_ID):
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, title, source_type, author, created_at, acl_group
+            FROM documents
+            WHERE tenant_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            [tenant_id],
+        ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "sourceType": row["source_type"],
+            "author": row["author"],
+            "timestamp": row["created_at"],
+            "aclGroup": row["acl_group"],
+        }
+        for row in rows
+    ]
 
 @router.post("/ingest")
 def ingest_document(body: IngestDocumentRequest, tenant_id: str = settings.DEFAULT_TENANT_ID):

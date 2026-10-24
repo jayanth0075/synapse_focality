@@ -13,12 +13,14 @@ import { apiClient } from '../api/client';
 
 interface WorkflowsPageProps {
   workflows: AgentWorkflow[];
+  onRunComplete: () => Promise<void>;
 }
 
-export const WorkflowsPage: React.FC<WorkflowsPageProps> = ({ workflows }) => {
+export const WorkflowsPage: React.FC<WorkflowsPageProps> = ({ workflows, onRunComplete }) => {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>(workflows[0]?.id || 'wf-ingestion');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(workflows[0]?.nodes[2]?.id || null);
   const [isSimulatingRun, setIsSimulatingRun] = useState(false);
+  const [runFeedback, setRunFeedback] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'canvas' | 'traces' | 'checkpointer'>('canvas');
 
   const activeWorkflow = workflows.find((w) => w.id === selectedWorkflowId) || workflows[0];
@@ -27,13 +29,13 @@ export const WorkflowsPage: React.FC<WorkflowsPageProps> = ({ workflows }) => {
   const handleSimulateStep = async () => {
     setIsSimulatingRun(true);
     try {
-      await apiClient.runWorkflowStep(selectedWorkflowId, selectedNodeId || undefined);
-    } catch (err) {
-      console.warn('Step run error:', err);
+      const result = await apiClient.runWorkflowStep(selectedWorkflowId, selectedNodeId || undefined);
+      await onRunComplete();
+      setRunFeedback(`Executed ${result.nodeName} in ${result.durationMs}ms.`);
+    } catch (error) {
+      setRunFeedback(error instanceof Error ? error.message : 'Workflow step failed.');
     } finally {
-      setTimeout(() => {
-        setIsSimulatingRun(false);
-      }, 700);
+      setIsSimulatingRun(false);
     }
   };
 
@@ -178,6 +180,11 @@ export const WorkflowsPage: React.FC<WorkflowsPageProps> = ({ workflows }) => {
             <Play size={12} />
             <span>{isSimulatingRun ? 'Executing...' : 'Simulate Run Step'}</span>
           </button>
+          {runFeedback && (
+            <span role="status" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              {runFeedback}
+            </span>
+          )}
         </div>
       </div>
 

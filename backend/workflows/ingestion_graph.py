@@ -2,6 +2,7 @@ import re
 import uuid
 import json
 import time
+import logging
 from datetime import datetime
 from typing import TypedDict, List, Dict, Any, Optional
 from langgraph.graph import StateGraph, START, END
@@ -12,6 +13,10 @@ from backend.models.domain import GraphNode, GraphEdge, NodeType, EdgeType
 from backend.graph.engine import KnowledgeGraphEngine
 from backend.services.llm_service import extract_entities_llm
 
+logger = logging.getLogger("synapse.ingestion")
+EDGE_LABEL_ALIASES = {"RESOLVES": "RESOLVED_BY", "DEPRECATES": "SUPERSEDES"}
+SUPPORTED_EDGE_LABELS = frozenset(EdgeType.__args__)
+
 class IngestionState(TypedDict):
     tenant_id: str
     document_id: str
@@ -21,6 +26,7 @@ class IngestionState(TypedDict):
     author: str
     acl_group: str
     project_id: Optional[str]
+    use_llm: bool
     normalized_chunks: List[str]
     extracted_entities: List[Dict[str, Any]]
     extracted_relations: List[Dict[str, Any]]
@@ -140,11 +146,24 @@ def extract_entities_and_relations(state: IngestionState) -> Dict[str, Any]:
     })
     
     # 1. Attempt LLM-powered Semantic Extraction if API Key is available
-    llm_extracted = extract_entities_llm(state["content"], title, author)
+    llm_extracted = (
+        extract_entities_llm(state["content"], title, author)
+        if state.get("use_llm", True)
+        else None
+    )
     if llm_extracted:
-        for ent in llm_extracted.get("entities", []):
-            ent_label = ent.get("label", "").strip()
+        llm_entities = llm_extracted.get("entities", [])
+        for ent in llm_entities if isinstance(llm_entities, list) else []:
+            if not isinstance(ent, dict):
+                continue
+            ent_label = ent.get("label", "")
+            if not isinstance(ent_label, str):
+                continue
+            ent_label = ent_label.strip()
             ent_type = ent.get("type", "Topic")
+            if ent_type not in NodeType.__args__:
+                logger.warning("Ignoring LLM entity with unsupported type %r", ent_type)
+                continue
             if not ent_label:
                 continue
             ent_id = f"node-{ent_type.lower()}-{re.sub(r'[^a-zA-Z0-9]', '', ent_label.lower())}"
@@ -168,17 +187,29 @@ def extract_entities_and_relations(state: IngestionState) -> Dict[str, Any]:
                     "supportingTextSpan": f"Extracted from {title}",
                     "confidence": ent.get("confidence", 0.95)
                 })
-        for rel in llm_extracted.get("relations", []):
-            if rel.get("source") and rel.get("target") and rel.get("label"):
-                relations.append({
-                    "id": f"edge-{uuid.uuid4().hex[:8]}",
-                    "source": rel["source"],
-                    "target": rel["target"],
-                    "label": rel["label"],
-                    "sourceId": doc_id,
-                    "supportingTextSpan": rel.get("supportingText", f"LLM relation from {title}"),
-                    "confidence": rel.get("confidence", 0.92)
-                })
+        llm_relations = llm_extracted.get("relations", [])
+        for rel in llm_relations if isinstance(llm_relations, list) else []:
+            if not isinstance(rel, dict):
+                continue
+            source = rel.get("source")
+            target = rel.get("target")
+            raw_label = rel.get("label")
+            if not isinstance(source, str) or not isinstance(target, str) or not isinstance(raw_label, str):
+                continue
+            label = EDGE_LABEL_ALIASES.get(raw_label.upper(), raw_label.upper())
+            if label not in SUPPORTED_EDGE_LABELS:
+                logger.warning("Ignoring LLM relationship with unsupported label %r", raw_label)
+                continue
+            supporting_text = rel.get("supportingText")
+            relations.append({
+                "id": f"edge-{uuid.uuid4().hex[:8]}",
+                "source": source,
+                "target": target,
+                "label": label,
+                "sourceId": doc_id,
+                "supportingTextSpan": supporting_text if isinstance(supporting_text, str) else f"LLM relation from {title}",
+                "confidence": rel.get("confidence", 0.92)
+            })
 
     # 2. Rule & Pattern-based Named Entity Recognition (NER) for Technical Architecture and Governance
     patterns = [

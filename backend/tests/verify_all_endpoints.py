@@ -1,20 +1,32 @@
+import os
+import time
 import urllib.request
-import urllib.parse
 import json
 import sys
 
-BASE_URL = "http://127.0.0.1:8000/api"
+BASE_URL = os.getenv("SYNAPSE_TEST_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+API_URL = f"{BASE_URL}/api"
+
+for attempt in range(30):
+    try:
+        with urllib.request.urlopen(f"{BASE_URL}/health", timeout=2) as response:
+            if response.status == 200:
+                break
+    except Exception:
+        if attempt == 29:
+            raise RuntimeError(f"Backend did not become ready at {BASE_URL}/health")
+        time.sleep(1)
 
 results = []
 
 def test_endpoint(method: str, path: str, payload=None, expected_status=200):
-    url = f"{BASE_URL}{path}"
+    url = f"{API_URL}{path}"
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"Content-Type": "application/json"} if data else {}
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             status = response.getcode()
             body = response.read().decode("utf-8")
             parsed = json.loads(body) if body else {}
@@ -59,7 +71,7 @@ projects = test_endpoint("GET", "/projects")
 test_endpoint("POST", "/projects", {
     "name": "Project Quantum Nexus",
     "description": "Distributed quantum-safe ledger protocol",
-    "status": "In Planning",
+    "status": "Active",
     "techStack": ["Rust", "Raft", "gRPC"],
     "decisions": ["Deploy Raft quorum with 5 nodes across multi-region VPC"],
     "risks": ["Asymmetric network partition latency spike"]
@@ -100,7 +112,7 @@ if alerts and len(alerts) > 0:
 
 # 6. Sources & Review Queue
 sources = test_endpoint("GET", "/sources")
-test_endpoint("POST", "/sources/src-slack-eng/sync")
+test_endpoint("POST", "/sources/connectors/conn-gmail/sync")
 review_items = test_endpoint("GET", "/sources/review-queue")
 if review_items and len(review_items) > 0:
     rev_id = review_items[0]["id"]

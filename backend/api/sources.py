@@ -20,7 +20,10 @@ def list_connectors(tenant_id: str = settings.DEFAULT_TENANT_ID):
 @router.post("/{connector_id}/sync")
 @router.post("/connectors/{connector_id}/sync")
 def sync_connector(connector_id: str, tenant_id: str = settings.DEFAULT_TENANT_ID):
-    return GoogleWorkspaceService.sync_connector(connector_id, tenant_id)
+    try:
+        return GoogleWorkspaceService.sync_connector(connector_id, tenant_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 @router.get("/review-queue", response_model=List[ReviewQueueItem])
 def list_review_queue(tenant_id: str = settings.DEFAULT_TENANT_ID):

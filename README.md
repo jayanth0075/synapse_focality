@@ -1,8 +1,8 @@
 # SYNAPSE — Enterprise Organizational Memory Agent & Knowledge Graph
 
-Production-quality, fully connected, live-demoable organizational intelligence platform by Artisan Systems.
+Demo-ready organizational intelligence platform by Artisan Systems, with seeded data, deterministic mock connectors, and optional LLM-backed extraction.
 
-SYNAPSE continuously ingests enterprise communications (emails, calendars, documents, RFCs, and incident post-mortems), maps that activity into an active temporal knowledge graph, and provides:
+SYNAPSE processes demo fixtures and user-provided communications (emails, calendars, documents, RFCs, and incident post-mortems), maps that activity into an active temporal knowledge graph, and provides:
 1. **Remember**: Document ingestion, chunking, entity extraction, relation mapping, and human-in-the-loop entity resolution.
 2. **Recall**: Permission-aware hybrid Q&A strictly grounded in verified citations with graph traversal paths.
 3. **Foresee (Foresight)**: Proactive risk detection that compares in-flight decisions against historical failure precedents and knowledge silos.
@@ -101,6 +101,12 @@ The app seeds its demo tenant on first startup. SQLite is intended for a single 
 
 ---
 
+## Deterministic Mock Connectors
+
+The Gmail, Calendar, and Drive connector cards use local fixture records, not live Google accounts or OAuth. Syncing a connector passes its fixture through the same LangGraph ingestion and SQLite persistence path as an uploaded document. Each connector fixture is ingested once; subsequent syncs report that it is already current. Use the Sources page's **Ingest Document** tab to add your own sample RFCs, meeting notes, or post-mortems.
+
+`GET /api/documents` lists ingested-document metadata without returning document contents. The persisted chunks and graph records are available to Ask SYNAPSE and the workflow screens. LLM credentials are optional; fixture sync uses deterministic extraction and does not call an external LLM.
+
 ## Running the Automated Test Suite
 
 Run the end-to-end integration and workflow test suite:
@@ -110,7 +116,7 @@ python -m unittest backend/tests/test_backend.py -v
 
 The suite uses a temporary SQLite database and disables Neo4j synchronization, so it does not modify `data_storage/synapse.db` or a configured Neo4j instance.
 
-All 8 automated tests verify:
+All 12 automated tests verify:
 1. `test_00_application_imports`: The FastAPI application and API routers import successfully.
 2. `test_01_uses_isolated_database`: The suite uses its temporary SQLite database.
 3. `test_02_seed_data_idempotency`: Multi-run database seed stability.
@@ -119,6 +125,10 @@ All 8 automated tests verify:
 6. `test_05_langgraph_ingestion_workflow`: Document chunking, NER extraction, and knowledge persistence.
 7. `test_06_langgraph_ask_workflow`: Grounded Q&A with verifiable citations and traversal paths.
 8. `test_07_langgraph_foresight_workflow`: Precedent causal chains and risk alert scoring.
+9. `test_08_mock_connector_sync_ingests_fixture_once`: Fixture ingestion, metadata listing, and repeat-sync idempotence.
+10. `test_09_unknown_connector_returns_not_found`: Invalid connector identifiers return 404.
+11. `test_10_create_project_maps_decision_fields`: Project creation persists decisions in the API's supported schema.
+12. `test_11_llm_relationship_alias_is_normalized`: LLM relationship labels are normalized to supported graph-edge types.
 
 ---
 

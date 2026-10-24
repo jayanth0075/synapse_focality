@@ -129,14 +129,15 @@ def extract_entities_llm(content: str, title: str, author: str) -> Optional[Dict
         "You are an enterprise knowledge graph extraction engine for SYNAPSE.\n"
         "Extract named entities and directed relationships from the text.\n"
         "Entity types allowed: 'Project', 'Person', 'Topic', 'Problem', 'Decision', 'Team', 'Document'.\n"
-        "Edge labels allowed: 'AUTHORED', 'MENTIONS', 'RESOLVES', 'DEPRECATES', 'DEPENDS_ON', 'OWNS', 'CONFLICTS_WITH'.\n"
+        "Edge labels allowed: 'ATTENDED', 'OWNS', 'AUTHORED', 'DECIDED', 'CAUSED', 'FAILED_DUE_TO', "
+        "'RESOLVED_BY', 'MENTIONS', 'SUPERSEDES', 'EXPERT_IN'.\n"
         "Output MUST be valid JSON adhering to this schema:\n"
         "{\n"
         '  "entities": [\n'
         '    {"id": "node-topic-raft", "label": "Raft Consensus", "type": "Topic", "summary": "brief summary", "confidence": 0.95}\n'
         "  ],\n"
         '  "relations": [\n'
-        '    {"source": "source_id", "target": "target_id", "label": "RESOLVES", "supportingText": "evidence span", "confidence": 0.92}\n'
+        '    {"source": "source_id", "target": "target_id", "label": "RESOLVED_BY", "supportingText": "evidence span", "confidence": 0.92}\n'
         "  ]\n"
         "}"
     )

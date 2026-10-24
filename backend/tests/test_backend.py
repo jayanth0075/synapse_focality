@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from fastapi.testclient import TestClient
 from backend.services.seed_data import seed_database
 from backend.database import get_db_connection
 from backend.graph.engine import KnowledgeGraphEngine
@@ -140,6 +141,92 @@ class TestSynapseBackend(unittest.TestCase):
         first_alert = res["generated_alerts"][0]
         self.assertIn("Precedent", first_alert["title"])
         self.assertTrue(len(first_alert["evidenceChain"]) >= 2)
+
+    def test_08_mock_connector_sync_ingests_fixture_once(self):
+        fixtures = [
+            ("conn-gmail", "Gmail Fixture: Atlas Partition Review", "email"),
+            ("conn-cal", "Calendar Fixture: Atlas Architecture Review", "calendar"),
+            ("conn-drive", "Drive Fixture: RFC-419 Quorum Addendum", "document"),
+        ]
+        with TestClient(app) as client:
+            for connector_id, title, source_type in fixtures:
+                with patch("backend.workflows.ingestion_graph.extract_entities_llm") as extract:
+                    first_sync = client.post(
+                        f"/api/sources/connectors/{connector_id}/sync"
+                    )
+                    second_sync = client.post(
+                        f"/api/sources/connectors/{connector_id}/sync"
+                    )
+                    extract.assert_not_called()
+                self.assertEqual(first_sync.status_code, 200, first_sync.text)
+                self.assertEqual(first_sync.json()["newItems"], 1)
+                self.assertTrue(first_sync.json()["fixtureMode"])
+                self.assertEqual(second_sync.status_code, 200, second_sync.text)
+                self.assertEqual(second_sync.json()["newItems"], 0)
+
+            documents = client.get("/api/documents")
+            self.assertEqual(documents.status_code, 200, documents.text)
+            document_metadata = {document["title"]: document for document in documents.json()}
+            for _, title, source_type in fixtures:
+                self.assertIn(title, document_metadata)
+                self.assertEqual(document_metadata[title]["sourceType"], source_type)
+                self.assertNotIn("content", document_metadata[title])
+
+    def test_09_unknown_connector_returns_not_found(self):
+        with TestClient(app) as client:
+            response = client.post("/api/sources/connectors/unknown/sync")
+        self.assertEqual(response.status_code, 404)
+
+    def test_10_create_project_maps_decision_fields(self):
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/projects",
+                json={
+                    "name": "Project Test Workspace",
+                    "status": "Active",
+                    "decisions": ["Use a three-zone witness quorum"],
+                },
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        project = response.json()
+        self.assertEqual(project["status"], "Active")
+        self.assertEqual(
+            project["keyDecisions"][0]["decision"],
+            "Use a three-zone witness quorum",
+        )
+        self.assertEqual(project["keyDecisions"][0]["decidedBy"], "Priya Sharma")
+
+    def test_11_llm_relationship_alias_is_normalized(self):
+        extracted = {
+            "entities": [
+                {"label": "Atlas Control", "type": "Topic", "summary": "Control plane."},
+                {"label": "Witness Partition", "type": "Problem", "summary": "A partition."},
+            ],
+            "relations": [
+                {
+                    "source": "node-topic-atlascontrol",
+                    "target": "node-problem-witnesspartition",
+                    "label": "RESOLVES",
+                    "supportingText": "Alias mapping test",
+                },
+            ],
+        }
+        with patch(
+            "backend.workflows.ingestion_graph.extract_entities_llm",
+            return_value=extracted,
+        ):
+            result = IngestionService.ingest_document(
+                title="LLM Relation Alias Test",
+                content="A test document for relationship normalization.",
+                tenant_id=settings.DEFAULT_TENANT_ID,
+            )
+        with get_db_connection() as conn:
+            edge = conn.execute(
+                "SELECT label FROM edges WHERE source_id = ? AND supporting_text_span = ?",
+                (result["documentId"], "Alias mapping test"),
+            ).fetchone()
+        self.assertIsNotNone(edge)
+        self.assertEqual(edge["label"], "RESOLVED_BY")
 
 if __name__ == "__main__":
     unittest.main()

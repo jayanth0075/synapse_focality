@@ -12,7 +12,8 @@ class IngestionService:
         author: str = "Priya Sharma",
         acl_group: str = "all",
         project_id: Optional[str] = None,
-        tenant_id: str = settings.DEFAULT_TENANT_ID
+        tenant_id: str = settings.DEFAULT_TENANT_ID,
+        use_llm: bool = True,
     ) -> Dict[str, Any]:
         doc_id = f"doc-{uuid.uuid4().hex[:8]}"
         initial_state = {
@@ -24,6 +25,7 @@ class IngestionService:
             "author": author,
             "acl_group": acl_group,
             "project_id": project_id,
+            "use_llm": use_llm,
             "normalized_chunks": [],
             "extracted_entities": [],
             "extracted_relations": [],

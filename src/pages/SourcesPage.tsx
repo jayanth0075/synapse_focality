@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   GitPullRequest,
   RefreshCw,
@@ -12,19 +12,27 @@ import {
   UploadCloud,
   Sparkles,
 } from 'lucide-react';
-import { SourceConnector, ReviewQueueItem } from '../types';
+import {
+  ConnectorSyncResult,
+  DocumentIngestionResult,
+  IngestedDocument,
+  SourceConnector,
+  ReviewQueueItem,
+} from '../types';
 import { apiClient } from '../api/client';
 
 interface SourcesPageProps {
   connectors: SourceConnector[];
   reviewQueue: ReviewQueueItem[];
-  onResolveMerge: (reviewId: string, action: 'merged' | 'rejected') => void;
+  onResolveMerge: (reviewId: string, action: 'merged' | 'rejected') => Promise<void>;
+  onDataChanged: () => Promise<void>;
 }
 
 export const SourcesPage: React.FC<SourcesPageProps> = ({
   connectors,
   reviewQueue,
   onResolveMerge,
+  onDataChanged,
 }) => {
   const [activeTab, setActiveTab] = useState<'review' | 'connectors' | 'ingest'>('review');
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
@@ -36,19 +44,45 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   const [docAuthor, setDocAuthor] = useState('Priya Sharma');
   const [docAcl, setDocAcl] = useState('all');
   const [isIngesting, setIsIngesting] = useState(false);
-  const [ingestResult, setIngestResult] = useState<any>(null);
+  const [ingestResult, setIngestResult] = useState<DocumentIngestionResult | null>(null);
+  const [documents, setDocuments] = useState<IngestedDocument[]>([]);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+
+  const refreshDocuments = async () => {
+    try {
+      setDocuments(await apiClient.getDocuments());
+      setDocumentError(null);
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : 'Could not load documents.');
+    }
+  };
+
+  useEffect(() => {
+    void refreshDocuments();
+  }, []);
 
   const pendingItems = reviewQueue.filter((item) => item.status === 'pending');
 
   const handleSyncTrigger = async (connectorId: string) => {
     setIsSyncing(connectorId);
     try {
-      const res = await apiClient.syncConnector(connectorId);
-      setSyncFeedback(`Sync complete: Processed ${res.newItems} new items. Cursor updated.`);
-    } catch {
-      setSyncFeedback('Sync triggered with fixture feed.');
+      const res: ConnectorSyncResult = await apiClient.syncConnector(connectorId);
+      await onDataChanged();
+      await refreshDocuments();
+      setSyncFeedback(res.message);
+    } catch (error) {
+      setSyncFeedback(error instanceof Error ? error.message : 'Connector sync failed.');
     } finally {
-      setTimeout(() => setIsSyncing(null), 800);
+      setIsSyncing(null);
+      setTimeout(() => setSyncFeedback(null), 4000);
+    }
+  };
+
+  const handleResolveReview = async (reviewId: string, action: 'merged' | 'rejected') => {
+    try {
+      await onResolveMerge(reviewId, action);
+    } catch (error) {
+      setSyncFeedback(error instanceof Error ? error.message : 'Could not resolve review item.');
       setTimeout(() => setSyncFeedback(null), 4000);
     }
   };
@@ -68,10 +102,19 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
         source_type: 'document',
       });
       setIngestResult(result);
+      await onDataChanged();
+      await refreshDocuments();
       setDocTitle('');
       setDocContent('');
-    } catch (err: any) {
-      setIngestResult({ error: err.message || 'Ingestion failed' });
+    } catch (error) {
+      setIngestResult({
+        documentId: '',
+        status: 'failed',
+        persistedNodes: [],
+        persistedEdges: [],
+        ambiguousMerges: [],
+        error: error instanceof Error ? error.message : 'Ingestion failed',
+      });
     } finally {
       setIsIngesting(false);
     }
@@ -79,6 +122,11 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
 
   return (
     <div style={{ padding: '24px 28px', maxWidth: 1360, margin: '0 auto', width: '100%' }}>
+      {syncFeedback && (
+        <div role="status" style={{ marginBottom: 12, color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+          {syncFeedback}
+        </div>
+      )}
       {/* Page Header */}
       <div
         style={{
@@ -107,7 +155,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
             )}
           </div>
           <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            Continuous ingestion feeds from Google Workspace + human verification queue ensuring knowledge graph integrity.
+            Deterministic Gmail, Calendar, and Drive fixtures feed the graph; sync is repeatable and does not connect to live Google accounts.
           </p>
         </div>
 
@@ -222,7 +270,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
 
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
-                      onClick={() => onResolveMerge(item.id, 'merged')}
+                      onClick={() => void handleResolveReview(item.id, 'merged')}
                       className="btn btn-sm btn-primary"
                       style={{ gap: 4, fontSize: '0.75rem' }}
                     >
@@ -230,7 +278,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
                       <span>Approve Merge (Single Node)</span>
                     </button>
                     <button
-                      onClick={() => onResolveMerge(item.id, 'rejected')}
+                      onClick={() => void handleResolveReview(item.id, 'rejected')}
                       className="btn btn-sm btn-secondary"
                       style={{ gap: 4, fontSize: '0.75rem' }}
                     >
@@ -400,9 +448,8 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{conn.name}</h3>
-                    <span className="badge badge-emerald" style={{ fontSize: '0.65rem' }}>
-                      {conn.status}
-                    </span>
+                    <span className="badge badge-emerald" style={{ fontSize: '0.65rem' }}>{conn.status}</span>
+                    <span className="badge badge-primary" style={{ fontSize: '0.65rem' }}>DEMO FIXTURE</span>
                   </div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
                     Last incremental sync: {conn.lastSyncTime} &bull; Processed items:{' '}
@@ -422,7 +469,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
                   style={{ gap: 6 }}
                 >
                   <RefreshCw size={13} className={isSyncing === conn.id ? 'animate-spin' : ''} />
-                  <span>{isSyncing === conn.id ? 'Syncing...' : 'Poll Incremental Sync'}</span>
+                  <span>{isSyncing === conn.id ? 'Syncing...' : 'Sync Fixture'}</span>
                 </button>
               </div>
             </div>
@@ -606,6 +653,33 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+          <div className="enterprise-card" style={{ padding: '20px 24px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
+              Ingested documents ({documents.length})
+            </h3>
+            {documentError ? (
+              <p role="alert" style={{ color: 'var(--status-danger)', fontSize: '0.8rem' }}>
+                {documentError}
+              </p>
+            ) : documents.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No documents have been ingested yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {documents.map((document) => (
+                  <div
+                    key={document.id}
+                    style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.78rem' }}
+                  >
+                    <div>
+                      <strong style={{ color: 'var(--text-primary)' }}>{document.title}</strong>
+                      <span style={{ color: 'var(--text-muted)' }}> &middot; {document.author} &middot; {document.sourceType}</span>
+                    </div>
+                    <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{document.aclGroup}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

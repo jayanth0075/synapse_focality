@@ -12,7 +12,7 @@ import { ProjectItem } from '../types';
 interface ProjectsPageProps {
   projects: ProjectItem[];
   onSelectProject: (projectId: string) => void;
-  onCreateProject: (newProject: Partial<ProjectItem>) => void;
+  onCreateProject: (newProject: Partial<ProjectItem>) => Promise<void>;
 }
 
 export const ProjectsPage: React.FC<ProjectsPageProps> = ({
@@ -23,6 +23,8 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // New Project Form State
   const [newCode, setNewCode] = useState('');
@@ -40,11 +42,14 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
     return matchStatus && matchSearch;
   });
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newCode.trim()) return;
+    if (!newName.trim() || !newCode.trim() || isSaving) return;
 
-    onCreateProject({
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onCreateProject({
       code: newCode.toUpperCase(),
       name: newName,
       description: newDesc,
@@ -71,12 +76,16 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
       ],
       relatedFailureRisks: [],
       linkedEntityIds: [],
-    });
-
-    setIsModalOpen(false);
-    setNewCode('');
-    setNewName('');
-    setNewDesc('');
+      });
+      setIsModalOpen(false);
+      setNewCode('');
+      setNewName('');
+      setNewDesc('');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not create project.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -379,6 +388,11 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
             </div>
 
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {saveError && (
+                <p role="alert" style={{ color: 'var(--status-danger)', fontSize: '0.8rem' }}>
+                  {saveError}
+                </p>
+              )}
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: 4 }}>
                   Project Code / Identifier
@@ -460,8 +474,9 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
                 <button
                   type="submit"
                   className="btn btn-primary"
+                  disabled={isSaving}
                 >
-                  Create Workspace
+                  {isSaving ? 'Creating...' : 'Create Workspace'}
                 </button>
               </div>
             </form>

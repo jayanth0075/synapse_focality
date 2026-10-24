@@ -50,124 +50,22 @@ export const AskPage: React.FC<AskPageProps> = ({
     setIsSimulatingStream(true);
 
     try {
-      // Call real LangGraph Question-Answering workflow on backend
       const liveResponse = await apiClient.askSynapse(query, currentUser?.id || 'usr-jayanth');
       setMessages((prev) => [...prev, liveResponse]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          sender: 'synapse',
+          text: error instanceof Error ? `Could not query the knowledge base: ${error.message}` : 'Could not query the knowledge base.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          citations: [],
+        },
+      ]);
+    } finally {
       setIsSimulatingStream(false);
-      return;
-    } catch (err) {
-      console.warn('Real LangGraph Ask API unavailable, using local fallback:', err);
     }
-    setTimeout(() => {
-      let botResponse: AskMessage;
-
-      if (query.toLowerCase().includes('expert') || query.toLowerCase().includes('raft')) {
-        botResponse = {
-          id: `bot-${Date.now()}`,
-          sender: 'synapse',
-          text: `Based on **knowledge graph hybrid retrieval** across 18 architecture reviews, RFC commits, and incident post-mortems:
-
-1. **Marcus Vance (Principal Architect)** is the primary authority on **Raft consensus algorithms** and multi-master replication in Artisan Systems [Doc-RFC419]. He has authored 4 RFCs and led the Orion Core query mesh design.
-2. **Elena Rostova (Staff SRE)** is the recognized authority on **cross-region network partitions and chaos fault injection** [Doc-882]. She is the sole author of the partition recovery runbook.
-3. **Priya Sharma (VP Eng)** holds secondary domain expertise in high-concurrency database internals and sponsored both initiatives.
-
-*Note: Elena Rostova has an upcoming 4-week PTO block scheduled in November 2026, posing an active single-point-of-failure risk on the Kafka partition failover pipeline.*`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          citations: [
-            {
-              id: 'Doc-RFC419',
-              title: 'Atlas Architecture RFC v2.3 (RFC-419)',
-              sourceType: 'document',
-              author: 'Marcus Vance (Principal Architect)',
-              timestamp: 'Aug 12, 2026',
-              snippet: 'Section 2.1: Consensus guarantees: Multi-datacenter Paxos/Raft election timeouts set to 300ms heartbeat interval.',
-              aclGroup: 'eng-all, architecture-board',
-              matchScore: 0.96,
-            },
-            {
-              id: 'Doc-882',
-              title: 'Post-Mortem: Incident 882 Analysis & Lessons Learned',
-              sourceType: 'document',
-              author: 'Elena Rostova (Staff SRE)',
-              timestamp: 'Nov 15, 2024',
-              snippet: 'Retrospective findings on asymmetric partition mitigation strategies.',
-              aclGroup: 'eng-all, confidential-postmortems',
-              matchScore: 0.93,
-            },
-          ],
-          graphPaths: [
-            {
-              nodes: ['Marcus Vance', 'Decided', 'RFC-419', 'Implements', 'Raft Protocol'],
-              description: 'Primary Consensus Authority Path',
-            },
-            {
-              nodes: ['Elena Rostova', 'Authored', 'Post-Mortem 882', 'Expert In', 'Split-Brain Network Partition'],
-              description: 'Partition Resilience Expertise Path',
-            },
-          ],
-          temporalScope: 'Active: 2024 - 2026 (Continuous)',
-        };
-      } else if (query.toLowerCase().includes('temporal') || query.toLowerCase().includes('ownership')) {
-        botResponse = {
-          id: `bot-${Date.now()}`,
-          sender: 'synapse',
-          text: `Querying **bi-temporal validity windows** for \`Project Atlas\` (valid_from / valid_to):
-
-- **Between Jan 2026 and April 2026**: Project Atlas was sponsored by **Marcus Vance** during the exploratory RFC phase [Doc-AtlasCharter].
-- **On April 10, 2026**: The ownership edge was invalidated and superseded when **Priya Sharma** was formally assigned as executive sponsor and technical owner (\`valid_from: 2026-04-10\`, \`valid_to: NULL (Active)\`).
-- The transition was ratified in the Q2 Platform Roadmap Steering Committee [Cal-Q2Steering].`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          citations: [
-            {
-              id: 'Doc-AtlasCharter',
-              title: 'Project Atlas Initiation Charter & Leadership Assignment',
-              sourceType: 'document',
-              author: 'Engineering Steering Committee',
-              timestamp: 'Apr 10, 2026',
-              snippet: 'Ownership of Project Atlas transfers to Priya Sharma, with Marcus Vance continuing as Principal Systems Architect.',
-              aclGroup: 'all, eng-leadership',
-              matchScore: 0.99,
-            },
-          ],
-          graphPaths: [
-            {
-              nodes: ['Marcus Vance', 'Owned (Expired 2026-04-10)', 'Project Atlas'],
-              description: 'Historical Ownership Edge',
-            },
-            {
-              nodes: ['Priya Sharma', 'OWNS (Active since 2026-04-10)', 'Project Atlas'],
-              description: 'Current Active Ownership Edge',
-            },
-          ],
-          temporalScope: 'Bi-temporal Query: As of April 10, 2026',
-        };
-      } else {
-        botResponse = {
-          id: `bot-${Date.now()}`,
-          sender: 'synapse',
-          text: `Searched 14,820 graph nodes and semantic embeddings for: *"${query}"*.
-
-Synapse retrieved relevant organizational facts across Google Workspace and verified them against the **Artisan Systems Knowledge Graph**. All facts strictly enforce access control filtering for your authenticated role [Doc-General].`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          citations: [
-            {
-              id: 'Doc-General',
-              title: 'Artisan Systems Core Knowledge Graph Digest',
-              sourceType: 'document',
-              author: 'Knowledge System Sync',
-              timestamp: 'Oct 2026',
-              snippet: 'Relevant organizational context retrieved from verified episodes.',
-              aclGroup: 'all',
-              matchScore: 0.88,
-            },
-          ],
-          temporalScope: 'Current: Oct 2026',
-        };
-      }
-
-      setMessages((prev) => [...prev, botResponse]);
-      setIsSimulatingStream(false);
-    }, 1100);
   };
 
   // Render markdown text with clickable inline citation badges

@@ -151,6 +151,34 @@ export interface SourceConnector {
   scopes: string[];
 }
 
+export interface IngestedDocument {
+  id: string;
+  title: string;
+  sourceType: string;
+  author: string;
+  timestamp: string;
+  aclGroup: string;
+}
+
+export interface ConnectorSyncResult {
+  connectorId: string;
+  status: SourceConnector['status'];
+  itemsProcessed: number;
+  newItems: number;
+  syncTime: string;
+  fixtureMode: boolean;
+  message: string;
+}
+
+export interface DocumentIngestionResult {
+  documentId: string;
+  status: string;
+  persistedNodes: string[];
+  persistedEdges: string[];
+  ambiguousMerges: unknown[];
+  error: string | null;
+}
+
 export interface WorkflowNode {
   id: string;
   label: string;

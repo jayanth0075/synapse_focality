@@ -63,55 +63,42 @@ export const App: React.FC = () => {
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
-  // Load live data from real FastAPI backend
+  const refreshWorkspaceData = async () => {
+    const [
+      projectsResult,
+      nodesResult,
+      edgesResult,
+      alertsResult,
+      reviewsResult,
+      connectorsResult,
+      workflowsResult,
+    ] = await Promise.allSettled([
+      apiClient.getProjects(),
+      apiClient.getNodes(),
+      apiClient.getEdges(undefined, currentUser.acls),
+      apiClient.getAlerts(),
+      apiClient.getReviewQueue(),
+      apiClient.getConnectors(),
+      apiClient.getWorkflows(),
+    ]);
+    if (projectsResult.status === 'fulfilled') setProjects(projectsResult.value);
+    else console.error('Failed to refresh projects:', projectsResult.reason);
+    if (nodesResult.status === 'fulfilled') setNodes(nodesResult.value);
+    else console.error('Failed to refresh graph nodes:', nodesResult.reason);
+    if (edgesResult.status === 'fulfilled') setEdges(edgesResult.value);
+    else console.error('Failed to refresh graph edges:', edgesResult.reason);
+    if (alertsResult.status === 'fulfilled') setAlerts(alertsResult.value);
+    else console.error('Failed to refresh alerts:', alertsResult.reason);
+    if (reviewsResult.status === 'fulfilled') setReviewQueue(reviewsResult.value);
+    else console.error('Failed to refresh review queue:', reviewsResult.reason);
+    if (connectorsResult.status === 'fulfilled') setConnectors(connectorsResult.value);
+    else console.error('Failed to refresh connectors:', connectorsResult.reason);
+    if (workflowsResult.status === 'fulfilled') setWorkflows(workflowsResult.value);
+    else console.error('Failed to refresh workflows:', workflowsResult.reason);
+  };
+
   useEffect(() => {
-    const fetchLiveData = async () => {
-      try {
-        const [
-          projsRes,
-          nodesRes,
-          edgesRes,
-          alertsRes,
-          reviewsRes,
-          connsRes,
-          wfsRes
-        ] = await Promise.allSettled([
-          apiClient.getProjects(),
-          apiClient.getNodes(),
-          apiClient.getEdges(undefined, currentUser.acls),
-          apiClient.getAlerts(),
-          apiClient.getReviewQueue(),
-          apiClient.getConnectors(),
-          apiClient.getWorkflows()
-        ]);
-
-        if (projsRes.status === 'fulfilled' && projsRes.value.length > 0) {
-          setProjects(projsRes.value);
-        }
-        if (nodesRes.status === 'fulfilled' && nodesRes.value.length > 0) {
-          setNodes(nodesRes.value);
-        }
-        if (edgesRes.status === 'fulfilled' && edgesRes.value.length > 0) {
-          setEdges(edgesRes.value);
-        }
-        if (alertsRes.status === 'fulfilled' && alertsRes.value.length > 0) {
-          setAlerts(alertsRes.value);
-        }
-        if (reviewsRes.status === 'fulfilled' && reviewsRes.value.length > 0) {
-          setReviewQueue(reviewsRes.value);
-        }
-        if (connsRes.status === 'fulfilled' && connsRes.value.length > 0) {
-          setConnectors(connsRes.value);
-        }
-        if (wfsRes.status === 'fulfilled' && wfsRes.value.length > 0) {
-          setWorkflows(wfsRes.value);
-        }
-      } catch (e) {
-        console.warn('Backend API connecting in background:', e);
-      }
-    };
-
-    fetchLiveData();
+    void refreshWorkspaceData();
   }, [currentUser]);
 
   // Keyboard shortcut Cmd+K / Ctrl+K
@@ -188,13 +175,9 @@ export const App: React.FC = () => {
       relatedFailureRisks: [],
       linkedEntityIds: [],
     };
-    try {
-      const saved = await apiClient.createProject(newProj);
-      setProjects((prev) => [saved, ...prev]);
-    } catch {
-      setProjects((prev) => [newProj, ...prev]);
-    }
-    setSelectedProjectId(newProj.id);
+    const saved = await apiClient.createProject(newProj);
+    setProjects((prev) => [saved, ...prev.filter((project) => project.id !== saved.id)]);
+    setSelectedProjectId(saved.id);
     setCurrentView('project-detail');
   };
 
@@ -209,36 +192,24 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateAlertFeedback = async (alertId: string, feedback: 'useful' | 'not_useful') => {
+    await apiClient.submitAlertFeedback(alertId, feedback);
     setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, feedbackStatus: feedback } : a))
+      prev.map((alert) => (alert.id === alertId ? { ...alert, feedbackStatus: feedback } : alert))
     );
-    try {
-      await apiClient.submitAlertFeedback(alertId, feedback);
-    } catch (err) {
-      console.error('Failed to submit feedback to backend:', err);
-    }
   };
 
   const handleDismissAlert = async (alertId: string) => {
+    await apiClient.dismissAlert(alertId);
     setAlerts((prev) =>
-      prev.map((a) => (a.id === alertId ? { ...a, status: 'dismissed' } : a))
+      prev.map((alert) => (alert.id === alertId ? { ...alert, status: 'dismissed' } : alert))
     );
-    try {
-      await apiClient.dismissAlert(alertId);
-    } catch (err) {
-      console.error('Failed to dismiss alert in backend:', err);
-    }
   };
 
   const handleResolveMerge = async (reviewId: string, action: 'merged' | 'rejected') => {
+    await apiClient.resolveReview(reviewId, action);
     setReviewQueue((prev) =>
-      prev.map((r) => (r.id === reviewId ? { ...r, status: action } : r))
+      prev.map((item) => (item.id === reviewId ? { ...item, status: action } : item))
     );
-    try {
-      await apiClient.resolveReview(reviewId, action);
-    } catch (err) {
-      console.error('Failed to resolve merge in backend:', err);
-    }
   };
 
   // Dedicated Views: Landing Page (accessible if explicitly needed, but not on persistent nav)
@@ -382,6 +353,7 @@ export const App: React.FC = () => {
               alerts={alerts}
               onUpdateAlertFeedback={handleUpdateAlertFeedback}
               onDismissAlert={handleDismissAlert}
+              onRunComplete={refreshWorkspaceData}
               onExploreEvidenceNode={handleExploreInGraph}
             />
           )}
@@ -391,11 +363,12 @@ export const App: React.FC = () => {
               connectors={connectors}
               reviewQueue={reviewQueue}
               onResolveMerge={handleResolveMerge}
+              onDataChanged={refreshWorkspaceData}
             />
           )}
 
           {currentView === 'workflows' && (
-            <WorkflowsPage workflows={workflows} />
+            <WorkflowsPage workflows={workflows} onRunComplete={refreshWorkspaceData} />
           )}
 
           {currentView === 'admin' && (

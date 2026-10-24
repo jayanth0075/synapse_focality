@@ -1,6 +1,7 @@
 import json
 import uuid
-from typing import Any, List, Optional
+from datetime import datetime
+from typing import Any, List, Literal, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from backend.database import get_db_connection, log_audit_event
@@ -47,7 +48,7 @@ class CreateProjectPayload(BaseModel):
     id: Optional[str] = None
     code: Optional[str] = None
     name: str
-    status: Optional[str] = "In Planning"
+    status: Optional[Literal["Active", "At Risk", "On Track", "Completed", "Archived"]] = "Active"
     healthScore: Optional[int] = 85
     owner: Optional[str] = "Priya Sharma"
     team: Optional[str] = "Core Platform"
@@ -75,20 +76,28 @@ def create_project(payload: CreateProjectPayload, tenant_id: str = settings.DEFA
     for d in (payload.decisions or []):
         key_decisions.append({
             "id": f"dec-{uuid.uuid4().hex[:6]}",
-            "title": str(d),
-            "date": "2026-10-24",
-            "status": "Proposed",
-            "rationale": "Strategic architecture proposal",
-            "author": payload.owner or "Priya Sharma"
+            "decision": str(d),
+            "decidedBy": payload.owner or "Priya Sharma",
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "status": "Under Review"
         })
     for d in (payload.keyDecisions or []):
-        key_decisions.append(d if isinstance(d, dict) else d.model_dump())
+        decision = d if isinstance(d, dict) else {"decision": str(d)}
+        key_decisions.append({
+            "id": decision.get("id") or f"dec-{uuid.uuid4().hex[:6]}",
+            "decision": decision.get("decision") or decision.get("title") or "Untitled decision",
+            "decidedBy": decision.get("decidedBy") or decision.get("author") or payload.owner or "Priya Sharma",
+            "date": decision.get("date") or datetime.now().strftime("%Y-%m-%d"),
+            "status": decision.get("status")
+            if decision.get("status") in {"Active", "Superseded", "Under Review"}
+            else "Under Review",
+        })
 
     proj_item = ProjectItem(
         id=proj_id,
         code=code,
         name=payload.name,
-        status=payload.status or "In Planning",
+        status=payload.status or "Active",
         healthScore=payload.healthScore or 85,
         owner=payload.owner or "Priya Sharma",
         team=payload.team or "Core Platform",
