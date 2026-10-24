@@ -59,23 +59,26 @@ flowchart TD
 - Python 3.12+
 - Node.js 18+ and `npm`
 
-### 2. Environment Configuration
+### 2. Install Dependencies
+```powershell
+python -m pip install -r requirements.txt
+npm ci
+```
+
+### 3. Environment Configuration
 Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
 
-### 3. Run Backend & Seed Database
+### 4. Run Backend & Seed Database
 From the project root:
 ```powershell
-# Run the seed command (deterministic & idempotent)
-python -m backend.services.seed_data
-
-# Start the FastAPI backend server (Port 8000)
+# The backend initializes and seeds the database automatically at startup.
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 4. Run Frontend
+### 5. Run Frontend
 In a separate terminal:
 ```powershell
 # Start Vite development server (Port 3000)
@@ -83,6 +86,18 @@ npm run dev
 ```
 
 Open `http://localhost:3000/#dashboard` in your browser.
+
+## Deploy to Railway
+
+The repository includes a Dockerfile that builds the React frontend and serves it with the FastAPI backend as one Railway service. The Railway configuration sets `/health` as the health check.
+
+1. In Railway, create a project from this GitHub repository and deploy the `main` branch.
+2. Add a Railway Volume to the service and set its mount path to `/data`.
+3. Add the variable `SYNAPSE_DB_PATH=/data/synapse.db` so SQLite data survives deploys and restarts.
+4. Optionally set `OPENAI_API_KEY` or `GEMINI_API_KEY` to enable the corresponding LLM provider. Neo4j is optional; set `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and `NEO4J_DATABASE` together to enable it.
+5. Generate a public domain in the service's Networking settings. Railway supplies `PORT` automatically.
+
+The app seeds its demo tenant on first startup. SQLite is intended for a single service replica; do not scale this service to multiple replicas while using the local database. This project currently has no authentication layer, so treat a publicly accessible deployment as a demo and do not upload confidential documents.
 
 ---
 
@@ -95,14 +110,15 @@ python -m unittest backend/tests/test_backend.py -v
 
 The suite uses a temporary SQLite database and disables Neo4j synchronization, so it does not modify `data_storage/synapse.db` or a configured Neo4j instance.
 
-All 7 automated tests verify:
-1. `test_00_uses_isolated_database`: The suite uses its temporary SQLite database.
-2. `test_01_seed_data_idempotency`: Multi-run database seed stability.
-3. `test_02_graph_engine_neighborhood_and_paths`: Ego-network and multi-hop path traversal.
-4. `test_03_temporal_validity`: Time-window queries (`validFrom`, `validTo`) filtering superseded decisions.
-5. `test_04_langgraph_ingestion_workflow`: Document chunking, NER extraction, and knowledge persistence.
-6. `test_05_langgraph_ask_workflow`: Grounded Q&A with verifiable citations and traversal paths.
-7. `test_06_langgraph_foresight_workflow`: Precedent causal chains and risk alert scoring.
+All 8 automated tests verify:
+1. `test_00_application_imports`: The FastAPI application and API routers import successfully.
+2. `test_01_uses_isolated_database`: The suite uses its temporary SQLite database.
+3. `test_02_seed_data_idempotency`: Multi-run database seed stability.
+4. `test_03_graph_engine_neighborhood_and_paths`: Ego-network and multi-hop path traversal.
+5. `test_04_temporal_validity`: Time-window queries (`validFrom`, `validTo`) filtering superseded decisions.
+6. `test_05_langgraph_ingestion_workflow`: Document chunking, NER extraction, and knowledge persistence.
+7. `test_06_langgraph_ask_workflow`: Grounded Q&A with verifiable citations and traversal paths.
+8. `test_07_langgraph_foresight_workflow`: Precedent causal chains and risk alert scoring.
 
 ---
 

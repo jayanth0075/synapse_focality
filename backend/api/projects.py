@@ -1,7 +1,8 @@
 import json
 import uuid
-from typing import List, Optional
+from typing import Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 from backend.database import get_db_connection, log_audit_event
 from backend.models.domain import ProjectItem
 from backend.config import settings

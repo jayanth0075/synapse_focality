@@ -16,7 +16,7 @@ def load_env_variables():
                 k = k.strip()
                 v = v.strip().strip("'\"")
                 if k:
-                    os.environ[k] = v
+                    os.environ.setdefault(k, v)
 
 load_env_variables()
 
@@ -46,4 +46,3 @@ class Settings(BaseModel):
         return bool(self.NEO4J_URI and self.NEO4J_PASSWORD)
 
 settings = Settings()
-

@@ -22,7 +22,7 @@ def get_active_provider() -> Optional[str]:
 def call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False) -> Optional[str]:
     """
     Unified LLM caller with multi-provider failover:
-    Supports OpenAI (GPT-4o / GPT-4o-mini) and Google Gemini (gemini-1.5-flash).
+    Supports OpenAI (GPT-4o-mini) and Google Gemini (gemini-2.5-flash).
     Returns None if no API keys are provided or if upstream network fails.
     """
     provider = get_active_provider()
@@ -54,21 +54,21 @@ def call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False) -> O
 
     elif provider == "gemini":
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
+
             api_key = os.getenv("GEMINI_API_KEY") or settings.GEMINI_API_KEY
-            genai.configure(api_key=api_key)
-            model_name = "gemini-1.5-flash"
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                system_instruction=system_prompt
+            client = genai.Client(api_key=api_key)
+            generation_config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.2,
+                response_mime_type="application/json" if json_mode else None,
             )
-            generation_config = {"temperature": 0.2}
-            if json_mode:
-                generation_config["response_mime_type"] = "application/json"
                 
-            response = model.generate_content(
-                user_prompt,
-                generation_config=generation_config
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=user_prompt,
+                config=generation_config,
             )
             return response.text
         except Exception as e:

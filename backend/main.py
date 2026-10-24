@@ -1,7 +1,10 @@
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from backend.config import settings
 from backend.services.seed_data import seed_database
 from backend.api import projects, graph, ask, foresight, sources, workflows, documents, admin
@@ -19,6 +22,8 @@ app = FastAPI(
     version=settings.APP_VERSION,
     lifespan=lifespan
 )
+
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "dist"
 
 # Enable CORS for local Vite dev server and external frontends
 app.add_middleware(
@@ -48,6 +53,20 @@ def health_check():
         "engine": "LangGraph + SQLite Knowledge Graph"
     }
 
+if FRONTEND_DIST.is_dir():
+    assets_dir = FRONTEND_DIST / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/", include_in_schema=False)
+    def serve_frontend():
+        return FileResponse(FRONTEND_DIST / "index.html")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "backend.main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=settings.SYNAPSE_ENV == "development",
+    )

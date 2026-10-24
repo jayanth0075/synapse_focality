@@ -1,6 +1,8 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from backend.services.seed_data import seed_database
 from backend.database import get_db_connection
 from backend.graph.engine import KnowledgeGraphEngine
@@ -8,6 +10,7 @@ from backend.services.ingestion_service import IngestionService
 from backend.workflows.ask_graph import ask_workflow
 from backend.workflows.foresight_graph import foresight_workflow
 from backend.config import settings
+from backend.main import app
 
 class TestSynapseBackend(unittest.TestCase):
     @classmethod
@@ -15,23 +18,38 @@ class TestSynapseBackend(unittest.TestCase):
         cls._original_database_path = settings.DATABASE_PATH
         cls._original_neo4j_uri = settings.NEO4J_URI
         cls._original_neo4j_password = settings.NEO4J_PASSWORD
+        cls._original_openai_api_key = settings.OPENAI_API_KEY
+        cls._original_gemini_api_key = settings.GEMINI_API_KEY
         cls._test_data_dir = tempfile.TemporaryDirectory()
+        cls._llm_environment = patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "", "GEMINI_API_KEY": ""},
+        )
+        cls._llm_environment.start()
         settings.DATABASE_PATH = str(Path(cls._test_data_dir.name) / "synapse_test.db")
         settings.NEO4J_URI = ""
         settings.NEO4J_PASSWORD = ""
+        settings.OPENAI_API_KEY = ""
+        settings.GEMINI_API_KEY = ""
         cls.addClassCleanup(setattr, settings, "DATABASE_PATH", cls._original_database_path)
         cls.addClassCleanup(setattr, settings, "NEO4J_URI", cls._original_neo4j_uri)
         cls.addClassCleanup(setattr, settings, "NEO4J_PASSWORD", cls._original_neo4j_password)
+        cls.addClassCleanup(setattr, settings, "OPENAI_API_KEY", cls._original_openai_api_key)
+        cls.addClassCleanup(setattr, settings, "GEMINI_API_KEY", cls._original_gemini_api_key)
+        cls.addClassCleanup(cls._llm_environment.stop)
         cls.addClassCleanup(cls._test_data_dir.cleanup)
         seed_database(force=True)
 
-    def test_00_uses_isolated_database(self):
+    def test_00_application_imports(self):
+        self.assertEqual(app.title, settings.APP_NAME)
+
+    def test_01_uses_isolated_database(self):
         self.assertEqual(
             Path(settings.DATABASE_PATH).parent,
             Path(self._test_data_dir.name),
         )
 
-    def test_01_seed_data_idempotency(self):
+    def test_02_seed_data_idempotency(self):
         with get_db_connection() as conn:
             proj_count = conn.execute("SELECT COUNT(*) as cnt FROM projects WHERE tenant_id = ?", [settings.DEFAULT_TENANT_ID]).fetchone()["cnt"]
             self.assertGreaterEqual(proj_count, 3)
@@ -48,7 +66,7 @@ class TestSynapseBackend(unittest.TestCase):
             recheck_count = conn.execute("SELECT COUNT(*) as cnt FROM projects WHERE tenant_id = ?", [settings.DEFAULT_TENANT_ID]).fetchone()["cnt"]
             self.assertEqual(proj_count, recheck_count)
 
-    def test_02_graph_engine_neighborhood_and_paths(self):
+    def test_03_graph_engine_neighborhood_and_paths(self):
         # Ego network for Project Atlas
         neighborhood = KnowledgeGraphEngine.get_neighborhood("node-atlas", settings.DEFAULT_TENANT_ID, depth=1)
         self.assertTrue(len(neighborhood["nodes"]) > 0)
@@ -58,7 +76,7 @@ class TestSynapseBackend(unittest.TestCase):
         paths = KnowledgeGraphEngine.find_multi_hop_paths("node-marcus", "node-out-outage2024", settings.DEFAULT_TENANT_ID, max_depth=3)
         self.assertIsInstance(paths, list)
 
-    def test_03_temporal_validity(self):
+    def test_04_temporal_validity(self):
         # Querying with as_of_date '2026-06-01' should show superseded 3-AZ decision as active
         nodes_past = KnowledgeGraphEngine.get_nodes(settings.DEFAULT_TENANT_ID, as_of_date="2026-06-01")
         dec_sync_past = next((n for n in nodes_past if n.id == "node-dec-sync"), None)
@@ -69,7 +87,7 @@ class TestSynapseBackend(unittest.TestCase):
         dec_sync_future = next((n for n in nodes_future if n.id == "node-dec-sync"), None)
         self.assertIsNone(dec_sync_future)
 
-    def test_04_langgraph_ingestion_workflow(self):
+    def test_05_langgraph_ingestion_workflow(self):
         # Ingest test architectural doc through LangGraph
         result = IngestionService.ingest_document(
             title="RFC-520: Zero-Trust Telemetry Mesh",
@@ -84,7 +102,7 @@ class TestSynapseBackend(unittest.TestCase):
         self.assertTrue(len(result["persistedNodes"]) > 0)
         self.assertTrue(len(result["persistedEdges"]) > 0)
 
-    def test_05_langgraph_ask_workflow(self):
+    def test_06_langgraph_ask_workflow(self):
         # Ask question answerable by seeded citations
         state = {
             "tenant_id": settings.DEFAULT_TENANT_ID,
@@ -106,7 +124,7 @@ class TestSynapseBackend(unittest.TestCase):
         citation_ids = [c["id"] for c in res["retrieved_citations"]]
         self.assertTrue("Doc-RFC419" in citation_ids)
 
-    def test_06_langgraph_foresight_workflow(self):
+    def test_07_langgraph_foresight_workflow(self):
         state = {
             "tenant_id": settings.DEFAULT_TENANT_ID,
             "project_id": "proj-atlas",
